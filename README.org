@@ -1,0 +1,5 @@
+* Basic Term
+
+Simple X11 VT100 terminal emulator, written in C. Using the following resources;
+- [[https://www.uninformativ.de/blog/postings/2018-02-24/0/POSTING-en.html][The very basics of a terminal emulator]]
+- [[http://mech.math.msu.su/~nap/2/GWindow/xintro.html][A Brief intro to X11 Programming]]
