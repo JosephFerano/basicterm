@@ -78,18 +78,9 @@ int read_pty(scrollback *sb) {
         if (readbuf[nread - 1] == '\n') {
             nread--;
         }
-        int nreturns = 0;
-        for (int i = 0; i < nread; i++) {
-            if (readbuf[i] == '\r') {
-                nreturns++;
-                for (int j = i; j < nread; j++) {
-                    readbuf[j] = readbuf[j + 1];
-                }
-            }
-        }
-        readbuf[nread - nreturns] = '\0';
+        readbuf[nread] = '\0';
         strcat(sb->buf, readbuf);
-        return nread - nreturns;
+        return nread;
     }
 }
 
@@ -103,7 +94,7 @@ int main(void) {
 
     InitWindow(screenWidth, screenHeight, "basic term");
 
-    SetTargetFPS(120);
+    SetTargetFPS(60);
 
     Font *fontDefault = load_font();
 
@@ -126,7 +117,7 @@ int main(void) {
     bool new_read = false;
     bool new_char = false;
     while (!WindowShouldClose()) {
-        float scroll_speed = 15.5f;
+        float scroll_speed = 35.5f;
         sb.ypos += GetMouseWheelMoveV().y * scroll_speed;
         sb.height = MeasureTextEx(*fontDefault, sb.buf, fontsize, 1).y;
 
@@ -185,8 +176,26 @@ int main(void) {
                 sb.length += nread;
                 new_read = true;
             }
-            ClearBackground(RAYWHITE);
-            DrawTextEx(*fontDefault, sb.buf, (Vector2){ 0, sb.ypos }, fontsize, 1, BLACK);
+            ClearBackground(BLACK);
+            int col_max = 200;
+            char row_buf[col_max];
+            int nrow = 0;
+            int ncol = 0;
+            int row_height = 18;
+            for (int c = 0; c <= sb.length; c++) {
+                if (sb.buf[c] == '\r') {
+                    continue;
+                } else if (sb.buf[c] == '\n' || sb.buf[c] == '\0' || ncol >= col_max) {
+                    row_buf[ncol] = '\0';
+                    Vector2 pos = { 0, nrow * row_height + sb.ypos };
+                    DrawTextEx(*fontDefault, row_buf, pos, fontsize, 0, RAYWHITE);
+                    nrow++;
+                    ncol = 0;
+                } else {
+                    row_buf[ncol] = sb.buf[c];
+                    ncol++;
+                }
+            }
         }
         EndDrawing();
     }
