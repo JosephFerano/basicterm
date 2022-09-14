@@ -10,12 +10,17 @@
 #include <string.h>
 #include <raylib.h>
 
+typedef struct scrollback {
+    float height;
+    float ypos;
+    int capacity;
+    int length;
+    char *buf;
+} scrollback;
+
 // PTY
 int master;
 int slave;
-
-// Scrollback
-char *scrollback;
 
 void spawn(void) {
     openpty(&master, &slave, NULL, NULL, NULL);
@@ -52,7 +57,7 @@ Font *load_font() {
     return fontDefault;
 }
 
-int read_pty(char *buf) {
+int read_pty(scrollback *sb) {
     ssize_t nread;
     char readbuf[256];
     switch (nread = read(master, readbuf, sizeof(readbuf))) {
@@ -66,20 +71,33 @@ int read_pty(char *buf) {
         printf("EOF\n");
         return 0;
     default:
+        if (sb->length + nread > sb->capacity) {
+            sb->capacity *= 2;
+            sb->buf = realloc(sb->buf, sb->capacity);
+        }
         if (readbuf[nread - 1] == '\n') {
             printf("this\n");
             nread--;
         }
-        readbuf[nread] = '\0';
-        strcat(buf, readbuf);
-        printf("Amount of bytes read %lu\n", nread);
-        printf("FD: %i Buf %s\n", master, buf);
-        return nread;
+        int nreturns = 0;
+        for (int i = 0; i < nread; i++) {
+            if (readbuf[i] == '\r') {
+                nreturns++;
+                for (int j = i; j < nread; j++) {
+                    readbuf[j] = readbuf[j + 1];
+                }
+            }
+        }
+        readbuf[nread - nreturns] = '\0';
+        strcat(sb->buf, readbuf);
+        return nread - nreturns;
     }
 }
 
 int main(void) {
     spawn();
+ 
+    scrollback sb = { 0 };
 
     const int screenWidth = 800;
     const int screenHeight = 550;
@@ -89,10 +107,11 @@ int main(void) {
     SetTargetFPS(120);
 
     Font *fontDefault = load_font();
-    
-    scrollback = malloc(4098);
-    scrollback[0] = '\0';
-    int sb_len = 0;
+
+    sb.capacity = 2048;
+    sb.buf = malloc(sb.capacity);
+    sb.buf[0] = '\0';
+    sb.length = 0;
     char buf[128];
     int buf_len = 0;
     
@@ -103,6 +122,8 @@ int main(void) {
     FD_ZERO(&rset);
     FD_SET(master, &rset);
 
+    sb.ypos = 0;
+
     while (!WindowShouldClose()) {
         int key = GetCharPressed();
         fontsize += GetMouseWheelMove();
@@ -111,15 +132,15 @@ int main(void) {
                 buf[buf_len] = (char)key;
                 buf[buf_len + 1] = '\0';
                 buf_len++;
-                scrollback[sb_len] = (char)key;
-                scrollback[sb_len + 1] = '\0';
-                sb_len++;
+                sb.buf[sb.length] = (char)key;
+                sb.buf[sb.length + 1] = '\0';
+                sb.length++;
             }
             key = GetCharPressed();
         }
         if (IsKeyPressed(KEY_ENTER)) {
-            sb_len -= buf_len;
-            scrollback[sb_len] = '\0';
+            sb.length -= buf_len;
+            sb.buf[sb.length] = '\0';
             write(master, buf, buf_len);
             write(master, "\r", 1);
             buf[0] = '\0';
@@ -129,27 +150,26 @@ int main(void) {
             if (buf_len > 0) {
                 buf_len--;
                 buf[buf_len] = '\0';
-                sb_len--;
-                scrollback[sb_len] = '\0';
+                sb.length--;
+                sb.buf[sb.length] = '\0';
             }
         }
 
         // Drawing
         BeginDrawing();
-        /* update(buf, &buf_len, rset); */
         {
-            int nread = read_pty(scrollback);
+            int nread = read_pty(&sb);
             if (nread > 0) {
-                /* printf("Amount of bytes read %i\n", nread); */
-                sb_len += nread;
+                sb.length += nread;
+                new_read = true;
             }
             ClearBackground(RAYWHITE);
-            DrawTextEx(*fontDefault, scrollback, (Vector2){ 10 , 10 }, fontsize, 1, BLACK);
+            DrawTextEx(*fontDefault, sb.buf, (Vector2){ 0, sb.ypos }, fontsize, 1, BLACK);
         }
         EndDrawing();
     }
 
+    free(sb.buf);
     close(master);
     CloseWindow();
-    return 0;
 }
