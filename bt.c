@@ -76,7 +76,6 @@ int read_pty(scrollback *sb) {
             sb->buf = realloc(sb->buf, sb->capacity);
         }
         if (readbuf[nread - 1] == '\n') {
-            printf("this\n");
             nread--;
         }
         int nreturns = 0;
@@ -96,7 +95,7 @@ int read_pty(scrollback *sb) {
 
 int main(void) {
     spawn();
- 
+
     scrollback sb = { 0 };
 
     const int screenWidth = 800;
@@ -114,7 +113,7 @@ int main(void) {
     sb.length = 0;
     char buf[128];
     int buf_len = 0;
-    
+
     int flags = fcntl(master, F_GETFL);
     flags |= O_NONBLOCK;
     fcntl(master, F_SETFL, flags);
@@ -124,9 +123,28 @@ int main(void) {
 
     sb.ypos = 0;
 
+    bool new_read = false;
+    bool new_char = false;
     while (!WindowShouldClose()) {
+        float scroll_speed = 15.5f;
+        sb.ypos += GetMouseWheelMoveV().y * scroll_speed;
+        sb.height = MeasureTextEx(*fontDefault, sb.buf, fontsize, 1).y;
+
+        if (new_read || new_char) {
+            if (sb.height - abs((int)sb.ypos) + fontsize > screenHeight) {
+                sb.ypos = -(sb.height - screenHeight) - fontsize;
+            }
+            new_read = false;
+            new_char = false;
+        } else {
+            if (sb.ypos > 0) {
+                sb.ypos = 0;
+            } else if (abs((int)sb.ypos) > sb.height - fontsize) {
+                sb.ypos = -(sb.height - fontsize);
+            }
+        }
+
         int key = GetCharPressed();
-        fontsize += GetMouseWheelMove();
         while (key > 0) {
             if ((key >= 32) && (key <= 125)) {
                 buf[buf_len] = (char)key;
@@ -137,7 +155,9 @@ int main(void) {
                 sb.length++;
             }
             key = GetCharPressed();
+            new_char = true;
         }
+
         if (IsKeyPressed(KEY_ENTER)) {
             sb.length -= buf_len;
             sb.buf[sb.length] = '\0';
@@ -145,6 +165,7 @@ int main(void) {
             write(master, "\r", 1);
             buf[0] = '\0';
             buf_len = 0;
+            new_char = true;
         }
         if (IsKeyPressed(KEY_BACKSPACE)) {
             if (buf_len > 0) {
@@ -153,6 +174,7 @@ int main(void) {
                 sb.length--;
                 sb.buf[sb.length] = '\0';
             }
+            new_char = true;
         }
 
         // Drawing
