@@ -193,6 +193,30 @@ int main(void) {
                     DrawTextEx(*fontDefault, row_buf, pos, fontsize, 0, RAYWHITE);
                     nrow++;
                     ncol = 0;
+                } if (sb.buf[c] == '\x1b') {
+                    int c2 = c + 1;
+                    // Control Sequence Introducer
+                    int csi_args[16];
+                    char csi_code;
+                    int nargs = 0;
+                    if (sb.buf[c2] == '[') {
+                        char *esc_buf = sb.buf + c2 + 1;
+                        while (true) {
+                            char *substr;
+                            long num = strtol(esc_buf, &substr, 10);
+                            if (esc_buf != substr) {
+                                csi_args[nargs++] = num;
+                                esc_buf = substr;
+                                if (substr[0] == ';') {
+                                    esc_buf++;
+                                }
+                                continue;
+                            }
+                            csi_code = substr[0];
+                            break;
+                        }
+                    }
+                    printf("Found an escape sequence. Code: %c.\n", csi_code);
                 } else {
                     row_buf[ncol] = sb.buf[c];
                     ncol++;
