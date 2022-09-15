@@ -18,29 +18,30 @@ typedef struct scrollback {
     char *buf;
 } scrollback;
 
-// PTY
-int master;
-int slave;
+typedef struct file_descriptors {
+    int master;
+    int child;
+} file_descriptors;
 
-void spawn(void) {
-    openpty(&master, &slave, NULL, NULL, NULL);
+void spawn(file_descriptors *fds) {
+    openpty(&fds->master, &fds->child, NULL, NULL, NULL);
     pid_t p = fork();
     if (p == 0) {
-        close(master);
+        close(fds->master);
 
         setsid();
-        ioctl(slave, TIOCSCTTY, NULL);
-        dup2(slave, 0);
-        dup2(slave, 1);
-        dup2(slave, 2);
+        ioctl(fds->child, TIOCSCTTY, NULL);
+        dup2(fds->child, 0);
+        dup2(fds->child, 1);
+        dup2(fds->child, 2);
 
         execle("/bin/dash", "-/bin/dash", (char *)NULL, (char *[]){ "TERM=dumb", NULL });
     } else {
-        close(slave);
+        close(fds->child);
     }
 }
 
-float fontsize = 12;
+static float fontsize = 12;
 
 Font *load_font() {
     unsigned int file_size = 0;
@@ -57,10 +58,10 @@ Font *load_font() {
     return fontDefault;
 }
 
-int read_pty(scrollback *sb) {
+int read_pty(file_descriptors *fds, scrollback *sb) {
     ssize_t nread;
     char readbuf[256];
-    switch (nread = read(master, readbuf, sizeof(readbuf))) {
+    switch (nread = read(fds->master, readbuf, sizeof(readbuf))) {
     case -1:
         if (errno == EAGAIN) {
             return 0;
@@ -85,9 +86,10 @@ int read_pty(scrollback *sb) {
 }
 
 int main(void) {
-    spawn();
-
     scrollback sb = { 0 };
+    file_descriptors fds = { 0 };
+
+    spawn(&fds);
 
     const int screenWidth = 800;
     const int screenHeight = 550;
@@ -105,12 +107,12 @@ int main(void) {
     char buf[128];
     int buf_len = 0;
 
-    int flags = fcntl(master, F_GETFL);
+    int flags = fcntl(fds.master, F_GETFL);
     flags |= O_NONBLOCK;
-    fcntl(master, F_SETFL, flags);
+    fcntl(fds.master, F_SETFL, flags);
     fd_set rset;
     FD_ZERO(&rset);
-    FD_SET(master, &rset);
+    FD_SET(fds.master, &rset);
 
     sb.ypos = 0;
 
@@ -152,8 +154,8 @@ int main(void) {
         if (IsKeyPressed(KEY_ENTER)) {
             sb.length -= buf_len;
             sb.buf[sb.length] = '\0';
-            write(master, buf, buf_len);
-            write(master, "\r", 1);
+            write(fds.master, buf, buf_len);
+            write(fds.master, "\r", 1);
             buf[0] = '\0';
             buf_len = 0;
             new_char = true;
@@ -171,7 +173,7 @@ int main(void) {
         // Drawing
         BeginDrawing();
         {
-            int nread = read_pty(&sb);
+            int nread = read_pty(&fds, &sb);
             if (nread > 0) {
                 sb.length += nread;
                 new_read = true;
@@ -201,6 +203,6 @@ int main(void) {
     }
 
     free(sb.buf);
-    close(master);
+    close(fds.master);
     CloseWindow();
 }
