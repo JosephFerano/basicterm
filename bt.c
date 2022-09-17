@@ -179,21 +179,24 @@ int main(void) {
                 new_read = true;
             }
             ClearBackground(BLACK);
+            Color current_color = RAYWHITE;
             int col_max = 200;
             char row_buf[col_max];
             int nrow = 0;
             int ncol = 0;
             int row_height = 18;
+            float row_posx = 0;
             for (int c = 0; c <= sb.length; c++) {
                 if (sb.buf[c] == '\r') {
                     continue;
                 } else if (sb.buf[c] == '\n' || sb.buf[c] == '\0' || ncol >= col_max) {
                     row_buf[ncol] = '\0';
-                    Vector2 pos = { 0, nrow * row_height + sb.ypos };
-                    DrawTextEx(*fontDefault, row_buf, pos, fontsize, 0, RAYWHITE);
+                    Vector2 pos = { row_posx, nrow * row_height + sb.ypos };
+                    DrawTextEx(*fontDefault, row_buf, pos, fontsize, 0, current_color);
                     nrow++;
                     ncol = 0;
-                } if (sb.buf[c] == '\x1b') {
+                    row_posx = 0;
+                } else if (sb.buf[c] == '\x1b') {
                     int c2 = c + 1;
                     // Control Sequence Introducer
                     int csi_args[16];
@@ -213,13 +216,41 @@ int main(void) {
                                 continue;
                             }
                             csi_code = substr[0];
+                            Color new_color = current_color;
+                            switch (csi_code) {
+                                case 'm':
+                                    for (int i = 0; i < nargs; i++) {
+                                        if (csi_args[i] == 31) {
+                                            new_color = RED;
+                                        } else if (csi_args[i] == 32) {
+                                            new_color = GREEN;
+                                        } else if (csi_args[i] == 33) {
+                                            new_color = YELLOW;
+                                        } else if (csi_args[i] == 34) {
+                                            new_color = BLUE;
+                                        } else if (csi_args[i] == 35) {
+                                            new_color = MAGENTA;
+                                        } else if (csi_args[i] == 36) {
+                                            new_color = SKYBLUE;
+                                        } else if (csi_args[i] == 0) {
+                                            new_color = RAYWHITE;
+                                        }
+                                    }
+                                    row_buf[ncol] = '\0';
+                                    Vector2 pos = { row_posx, nrow * row_height + sb.ypos };
+                                    DrawTextEx(*fontDefault, row_buf, pos, fontsize, 0, current_color);
+                                    current_color = new_color;
+                                    ncol = 0;
+                                    c += (substr) - (sb.buf + c);
+                                    int width = MeasureTextEx(*fontDefault, row_buf, fontsize, 1).x;
+                                    row_posx += width + 0.85;
+                                  break;
+                            }
                             break;
                         }
                     }
-                    printf("Found an escape sequence. Code: %c.\n", csi_code);
                 } else {
-                    row_buf[ncol] = sb.buf[c];
-                    ncol++;
+                    row_buf[ncol++] = sb.buf[c];
                 }
             }
         }
