@@ -96,6 +96,12 @@ int main(void) {
 
     InitWindow(screenWidth, screenHeight, "basic term");
 
+    struct winsize sz;
+    int result = ioctl(fds.master, TIOCGWINSZ, &sz);
+    sz.ws_col = 200;
+    sz.ws_row = 120;
+    result = ioctl(fds.master, TIOCSWINSZ, &sz);
+
     SetTargetFPS(60);
 
     Font *fontDefault = load_font();
