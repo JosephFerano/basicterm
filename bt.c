@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pty.h>
-#include <ctype.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
@@ -35,7 +34,7 @@ void spawn(file_descriptors *fds) {
         dup2(fds->child, 1);
         dup2(fds->child, 2);
 
-        execle("/bin/dash", "-/bin/dash", (char *)NULL, (char *[]){ "TERM=dumb", NULL });
+        execle("/bin/bash", "-/bin/bash", (char *)NULL, (char *[]){ "TERM=dumb", NULL });
     } else {
         close(fds->child);
     }
@@ -43,15 +42,15 @@ void spawn(file_descriptors *fds) {
 
 static float fontsize = 12;
 
-Font *load_font() {
+Font *load_font(void) {
     unsigned int file_size = 0;
     char *font = "./fira.ttf";
     unsigned char *fontdata = LoadFileData(font, &file_size);
     Font *fontDefault = calloc(1, sizeof(Font));
-    fontDefault->baseSize = fontsize;
+    fontDefault->baseSize = (int)fontsize;
     fontDefault->glyphCount = 95;
 
-    fontDefault->glyphs = LoadFontData(fontdata, file_size, 16, 0, 95, FONT_DEFAULT);
+    fontDefault->glyphs = LoadFontData(fontdata, (int)file_size, 16, 0, 95, FONT_DEFAULT);
     Image atlas = GenImageFontAtlas(fontDefault->glyphs, &fontDefault->recs, 95, 16, 4, 0);
     fontDefault->texture = LoadTextureFromImage(atlas);
     UnloadImage(atlas);
@@ -130,7 +129,7 @@ int main(void) {
         sb.height = MeasureTextEx(*fontDefault, sb.buf, fontsize, 1).y;
 
         if (new_read || new_char) {
-            if (sb.height - abs((int)sb.ypos) + fontsize > screenHeight) {
+            if (sb.height - (float)abs((int)sb.ypos) + fontsize > (float)screenHeight) {
                 sb.ypos = -(sb.height - screenHeight) - fontsize;
             }
             new_read = false;

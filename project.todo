@@ -1,0 +1,28 @@
+#-*- mode: org -*-
+#+TODO: BLOCKED TODO INPROGRESS | DONE BACKLOG
+#+STARTUP: overview
+
+
+* DONE Render with Raylib
+* DONE Load custom Mono font
+* DONE Render input from user
+* DONE Do not block Raylib so we can loop while reading
+* DONE Create scrollback struct
+* DONE Scrolling the scrollback buffer
+* DONE Auto-scrolling
+* DONE Render scrollback by rows
+* DONE Handle color escape sequences
+* TODO Backspace and Return aren't repeating [[https://github.com/raysan5/raylib/issues/2041][Issue Here]]
+* TODO Switch to SDL2
+* TODO Only draw scrollback that is visible
+* TODO Improve the scrolling to match first and last lines
+* TODO Handle unicode characters
+* TODO Handle canonical and raw commands
+* TODO Mouse copy/paste
+* TODO Manually control when raylib updates/draws
+* TODO Create basic vertical splits
+
+* COMMENT Local variables
+;; Local Variables:
+;; eval: (olivetti-mode t)
+;; End:
